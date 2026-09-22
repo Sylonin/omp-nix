@@ -1,71 +1,19 @@
-# omp-nix
+# omp-nix (patched)
 
-Nix flake for [Oh My Pi](https://github.com/can1357/oh-my-pi) — a coding agent with the IDE wired in.
+Nix flake for [Oh My Pi](https://github.com/can1357/oh-my-pi), built from each upstream release with the patches in `patches/` applied. Only `x86_64-linux` is built.
 
-Automatically tracks the latest release and updates binaries daily via CI.
+`.github/workflows/build.yml` runs every 2 hours and on changes to `patches/`. When the latest upstream release or the patch set differs from `versions.json`, it:
 
-## Usage
+1. Checks out the upstream release tag and applies `patches/*.patch`.
+2. Installs the matching `@oh-my-pi/pi-natives-linux-x64` addons from npm, so no Rust build is needed.
+3. Builds and smoke-tests `omp-linux-x64`.
+4. Publishes it as release `v<version>-p<patch hash>`, updates `versions.json`, verifies `nix build`, and commits.
 
-### Run directly
-
-```bash
-nix run github:yuxqiu/omp-nix
-```
-
-### Install into a profile
-
-```bash
-nix profile install github:yuxqiu/omp-nix
-```
-
-### Add to your own flake
+A patch that no longer applies fails the run; fix the patch and push.
 
 ```nix
 {
-  inputs.omp-nix.url = "github:yuxqiu/omp-nix";
-
-  outputs = { nixpkgs, omp-nix, ... }@inputs: {
-    # Use inputs.omp-nix.packages.${system}.default
-  };
+  inputs.omp-nix.url = "github:Sylonin/omp-nix";
+  # inputs.omp-nix.packages.x86_64-linux.default
 }
-```
-
-### Use as an overlay
-
-```nix
-{
-  inputs.omp-nix.url = "github:yuxqiu/omp-nix";
-
-  outputs = { nixpkgs, omp-nix, ... }@inputs: let
-    pkgs = import nixpkgs {
-      system = "x86_64-linux";
-      overlays = [ omp-nix.overlays.default ];
-    };
-  in {
-    # pkgs.oh-my-pi is now available
-  };
-}
-```
-
-## Supported platforms
-
-| Platform | Arch |
-|----------|------|
-| Linux    | x86_64, aarch64 |
-| macOS    | x86_64, aarch64 |
-
-## Auto-updates
-
-A GitHub Actions workflow runs daily (and on manual trigger) to check for new releases. When a new version is found, it:
-
-1. Fetches the latest release assets
-2. Computes Nix hashes for each platform
-3. Updates `versions.json`
-4. Verifies the build succeeds
-5. Commits the update and creates a GitHub Release
-
-## Manual update
-
-```bash
-./scripts/update.sh
 ```

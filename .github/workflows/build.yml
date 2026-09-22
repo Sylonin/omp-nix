@@ -1,0 +1,126 @@
+name: Build patched omp
+
+on:
+  schedule:
+    - cron: "17 */2 * * *"
+  push:
+    branches: [main]
+    paths: ["patches/**", ".github/workflows/build.yml"]
+  workflow_dispatch:
+
+concurrency:
+  group: build
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check upstream release and patch set
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag=$(gh release view -R can1357/oh-my-pi --json tagName -q .tagName)
+          version=${tag#v}
+          patches=$(cat patches/*.patch | sha256sum | cut -c1-8)
+          if [ "$version" = "$(jq -r .version versions.json)" ] && [ "$patches" = "$(jq -r .patches versions.json)" ]; then
+            echo "Up to date: $version with patches $patches"
+            echo build=false >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # Upstream publishes the npm native addons in parallel with the GitHub release.
+          if ! npm view "@oh-my-pi/pi-natives-linux-x64@$version" version >/dev/null 2>&1; then
+            echo "::notice::Native addons for $version are not on npm yet; the next run retries."
+            echo build=false >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          {
+            echo build=true
+            echo tag="$tag"
+            echo version="$version"
+            echo patches="$patches"
+            echo release="v$version-p$patches"
+          } >> "$GITHUB_OUTPUT"
+
+      - if: steps.check.outputs.build == 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: can1357/oh-my-pi
+          ref: ${{ steps.check.outputs.tag }}
+          path: upstream
+
+      - if: steps.check.outputs.build == 'true'
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Build patched linux-x64 binary
+        if: steps.check.outputs.build == 'true'
+        working-directory: upstream
+        env:
+          VERSION: ${{ steps.check.outputs.version }}
+        run: |
+          set -euo pipefail
+          git apply --verbose ../patches/*.patch
+          bun install --frozen-lockfile
+          natives=$(mktemp -d)
+          curl -fsSL --retry 3 "$(npm view "@oh-my-pi/pi-natives-linux-x64@$VERSION" dist.tarball)" | tar -xz -C "$natives"
+          for variant in baseline modern; do
+            mkdir -p "$natives/src/natives-linux-x64-$variant"
+            mv "$natives/package/pi_natives.linux-x64-$variant.node" "$natives/src/natives-linux-x64-$variant/"
+          done
+          bun scripts/bazel-natives.ts linux-x64-baseline linux-x64-modern --source "$natives/src" --dest packages/natives/native
+          RELEASE_TARGETS=linux-x64 bun run ci:release:build-binaries
+          runtime=$(mktemp -d)
+          HOME="$runtime/home" XDG_DATA_HOME="$runtime/xdg" packages/coding-agent/binaries/omp-linux-x64 --version
+          HOME="$runtime/home" XDG_DATA_HOME="$runtime/xdg" packages/coding-agent/binaries/omp-linux-x64 --smoke-test
+
+      - name: Publish release and update versions.json
+        if: steps.check.outputs.build == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.check.outputs.version }}
+          PATCHES: ${{ steps.check.outputs.patches }}
+          RELEASE: ${{ steps.check.outputs.release }}
+        run: |
+          set -euo pipefail
+          bin=upstream/packages/coding-agent/binaries/omp-linux-x64
+          # A release that exists here was never committed to versions.json, so replacing it is safe.
+          gh release delete "$RELEASE" --cleanup-tag -y 2>/dev/null || true
+          gh release create "$RELEASE" "$bin" --target "$GITHUB_SHA" \
+            --title "oh-my-pi $VERSION (patches $PATCHES)" \
+            --notes "Upstream can1357/oh-my-pi v$VERSION with patches/*.patch (sha256 prefix $PATCHES) applied."
+          jq -n \
+            --arg version "$VERSION" \
+            --arg patches "$PATCHES" \
+            --arg url "https://github.com/$GITHUB_REPOSITORY/releases/download/$RELEASE/omp-linux-x64" \
+            --arg hash "sha256-$(openssl dgst -sha256 -binary "$bin" | base64 -w0)" \
+            '{version: $version, patches: $patches, url: $url, hash: $hash}' > versions.json
+          cat versions.json
+
+      - if: steps.check.outputs.build == 'true'
+        uses: cachix/install-nix-action@v31
+
+      - name: Verify flake build
+        if: steps.check.outputs.build == 'true'
+        run: |
+          nix build .#default --print-build-logs
+          ./result/bin/omp --version
+
+      - name: Commit versions.json
+        if: steps.check.outputs.build == 'true'
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add versions.json
+          git commit -m "oh-my-pi: ${{ steps.check.outputs.release }}"
+          git pull --rebase
+          git push

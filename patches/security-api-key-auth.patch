@@ -1,0 +1,57 @@
+diff --git a/packages/coding-agent/src/security/auth.ts b/packages/coding-agent/src/security/auth.ts
+index adb7dcb..3120bc4 100644
+--- a/packages/coding-agent/src/security/auth.ts
++++ b/packages/coding-agent/src/security/auth.ts
+@@ -1,7 +1,6 @@
+ import type { AgentOptions } from "@oh-my-pi/pi-agent-core";
+ import type { OAuthAccessResolution } from "@oh-my-pi/pi-ai";
+ import type { ApiKeyResolver } from "@oh-my-pi/pi-ai/auth-retry";
+-import { getProviderDefinition } from "@oh-my-pi/pi-ai/registry";
+ import type { AuthStorage } from "../session/auth-storage";
+ import type { SecurityAccountRef, SecurityAuthRef } from "./contracts";
+ 
+@@ -28,10 +27,6 @@ function isOAuthAccount(auth: SecurityAuthRef): auth is SecurityAccountRef {
+ 	return "credentialId" in auth;
+ }
+ 
+-function supportsProviderAuth(model: SecurityAuthModel): boolean {
+-	return getProviderDefinition(model.provider)?.nativeAuthApis?.includes(model.api) ?? false;
+-}
+-
+ /** Rejects changes to any durable OAuth identity field captured by preflight. */
+ export function assertSecurityIdentityMatches(
+ 	account: SecurityAccountRef,
+@@ -96,7 +91,7 @@ export function selectSecurityOAuthAccount(
+ 	return account;
+ }
+ 
+-/** Selects either one exact OAuth row or an explicitly supported provider-owned auth route. */
++/** Selects one exact OAuth row, or falls back to the provider's normal credential resolution. */
+ export function selectSecurityAuth(
+ 	authStorage: AuthStorage,
+ 	model: SecurityAuthModel,
+@@ -104,13 +99,7 @@ export function selectSecurityAuth(
+ 	sessionId?: string,
+ ): SecurityAuthRef {
+ 	const account = selectOAuthAccount(authStorage, model.provider, requestedCredentialId, sessionId);
+-	if (account) return account;
+-	if (supportsProviderAuth(model)) return { provider: model.provider, api: model.api };
+-	const nativeApis = getProviderDefinition(model.provider)?.nativeAuthApis;
+-	if (nativeApis) {
+-		throw new Error(`Security scans do not support provider authentication for ${model.provider}/${model.api}`);
+-	}
+-	throw new Error(`Security scans require a stored OAuth account for ${model.provider}`);
++	return account ?? { provider: model.provider, api: model.api };
+ }
+ 
+ /** Resolves one pinned OAuth row and verifies that its durable identity has not changed. */
+@@ -168,9 +157,6 @@ export function createSecurityAuthResolver(
+ 		if (model.api !== auth.api) {
+ 			throw new Error("Security scan authentication API mismatch");
+ 		}
+-		if (!supportsProviderAuth(model)) {
+-			throw new Error(`Security scans do not support provider authentication for ${model.provider}/${model.api}`);
+-		}
+ 		return providerResolver(model);
+ 	};
+ }
