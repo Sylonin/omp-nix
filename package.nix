@@ -51,6 +51,10 @@ in stdenv.mkDerivation {
       mkdir -p $out/bin
       install -m755 ${omp-bin}/bin/omp $out/bin/omp
       patchelf --set-interpreter ${interpreter} $out/bin/omp
+      # Mnemopi's embedder dlopen()s a prebuilt ONNX addon that needs
+      # libstdc++, which a NixOS dynamic linker cannot find on its own.
+      wrapProgram $out/bin/omp \
+        --prefix LD_LIBRARY_PATH : ${lib.makeLibraryPath [ stdenv.cc.cc.lib ]}
       runHook postInstall
     '' else ''
       runHook preInstall
