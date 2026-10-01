@@ -1,4 +1,4 @@
-{ stdenv, lib, fetchurl, makeWrapper, patchelf, version, url, nixHash }:
+{ stdenv, lib, fetchurl, makeWrapper, patchelf, python3Packages, version, url, nixHash }:
 
 let
   omp-bin = stdenv.mkDerivation {
@@ -25,6 +25,11 @@ let
   isLinux = stdenv.hostPlatform.isLinux;
   interpreter = "${stdenv.cc.bintools.dynamicLinker}";
 
+  trafilatura = assert lib.assertMsg
+    (python3Packages.trafilatura.version == "2.2.0")
+    "omp-nix expects trafilatura 2.2.0, nixpkgs provides ${python3Packages.trafilatura.version}";
+    python3Packages.trafilatura;
+
 in stdenv.mkDerivation {
   pname = "oh-my-pi";
   inherit version;
@@ -45,23 +50,30 @@ in stdenv.mkDerivation {
   dontStrip = true;
   dontPatchELF = true;
 
-  installPhase =
-    if isLinux then ''
-      runHook preInstall
-      mkdir -p $out/bin
-      install -m755 ${omp-bin}/bin/omp $out/bin/omp
-      patchelf --set-interpreter ${interpreter} $out/bin/omp
-      # Mnemopi's embedder dlopen()s a prebuilt ONNX addon that needs
-      # libstdc++, which a NixOS dynamic linker cannot find on its own.
-      wrapProgram $out/bin/omp \
-        --prefix LD_LIBRARY_PATH : ${lib.makeLibraryPath [ stdenv.cc.cc.lib ]}
-      runHook postInstall
-    '' else ''
-      runHook preInstall
-      mkdir -p $out/bin
-      makeWrapper ${omp-bin}/bin/omp $out/bin/omp
-      runHook postInstall
-    '';
+  # omp's `trafilatura` fetch provider shells out to a `trafilatura` binary and,
+  # when it is missing, tries `uv`/`pip install`, which cannot work on NixOS.
+  # The wrapper drops PYTHONPATH/NIX_PYTHONPATH because shells such as devenv
+  # export them for another Python and the foreign lxml shadows ours.
+  installPhase = ''
+    runHook preInstall
+    mkdir -p $out/bin $out/libexec/omp
+    makeWrapper ${trafilatura}/bin/trafilatura \
+      $out/libexec/omp/trafilatura \
+      --unset PYTHONPATH --unset NIX_PYTHONPATH
+  '' + (if isLinux then ''
+    install -m755 ${omp-bin}/bin/omp $out/bin/omp
+    patchelf --set-interpreter ${interpreter} $out/bin/omp
+    # Mnemopi's embedder dlopen()s a prebuilt ONNX addon that needs
+    # libstdc++, which a NixOS dynamic linker cannot find on its own.
+    wrapProgram $out/bin/omp \
+      --prefix LD_LIBRARY_PATH : ${lib.makeLibraryPath [ stdenv.cc.cc.lib ]} \
+      --prefix PATH : $out/libexec/omp
+  '' else ''
+    makeWrapper ${omp-bin}/bin/omp $out/bin/omp \
+      --prefix PATH : $out/libexec/omp
+  '') + ''
+    runHook postInstall
+  '';
 
   meta = with lib; {
     description = "A coding agent with the IDE wired in";
