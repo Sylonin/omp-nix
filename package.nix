@@ -25,10 +25,7 @@ let
   isLinux = stdenv.hostPlatform.isLinux;
   interpreter = "${stdenv.cc.bintools.dynamicLinker}";
 
-  trafilatura = assert lib.assertMsg
-    (python3Packages.trafilatura.version == "2.2.0")
-    "omp-nix expects trafilatura 2.2.0, nixpkgs provides ${python3Packages.trafilatura.version}";
-    python3Packages.trafilatura;
+  inherit (python3Packages) trafilatura;
 
 in stdenv.mkDerivation {
   pname = "oh-my-pi";
