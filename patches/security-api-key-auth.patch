@@ -1,16 +1,16 @@
 diff --git a/packages/coding-agent/src/security/auth.ts b/packages/coding-agent/src/security/auth.ts
-index adb7dcb..3120bc4 100644
+index 33b96c2..16b9450 100644
 --- a/packages/coding-agent/src/security/auth.ts
 +++ b/packages/coding-agent/src/security/auth.ts
-@@ -1,7 +1,6 @@
- import type { AgentOptions } from "@oh-my-pi/pi-agent-core";
- import type { OAuthAccessResolution } from "@oh-my-pi/pi-ai";
+@@ -2,7 +2,6 @@ import type { AgentOptions } from "@oh-my-pi/pi-agent-core";
+ import type { OAuthAccessResolution, OAuthRefreshReason } from "@oh-my-pi/pi-ai";
  import type { ApiKeyResolver } from "@oh-my-pi/pi-ai/auth-retry";
+ import * as AIError from "@oh-my-pi/pi-ai/error";
 -import { getProviderDefinition } from "@oh-my-pi/pi-ai/registry";
  import type { AuthStorage } from "../session/auth-storage";
  import type { SecurityAccountRef, SecurityAuthRef } from "./contracts";
  
-@@ -28,10 +27,6 @@ function isOAuthAccount(auth: SecurityAuthRef): auth is SecurityAccountRef {
+@@ -29,10 +28,6 @@ function isOAuthAccount(auth: SecurityAuthRef): auth is SecurityAccountRef {
  	return "credentialId" in auth;
  }
  
@@ -21,7 +21,7 @@ index adb7dcb..3120bc4 100644
  /** Rejects changes to any durable OAuth identity field captured by preflight. */
  export function assertSecurityIdentityMatches(
  	account: SecurityAccountRef,
-@@ -96,7 +91,7 @@ export function selectSecurityOAuthAccount(
+@@ -97,7 +92,7 @@ export function selectSecurityOAuthAccount(
  	return account;
  }
  
@@ -30,7 +30,7 @@ index adb7dcb..3120bc4 100644
  export function selectSecurityAuth(
  	authStorage: AuthStorage,
  	model: SecurityAuthModel,
-@@ -104,13 +99,7 @@ export function selectSecurityAuth(
+@@ -105,13 +100,7 @@ export function selectSecurityAuth(
  	sessionId?: string,
  ): SecurityAuthRef {
  	const account = selectOAuthAccount(authStorage, model.provider, requestedCredentialId, sessionId);
@@ -45,7 +45,7 @@ index adb7dcb..3120bc4 100644
  }
  
  /** Resolves one pinned OAuth row and verifies that its durable identity has not changed. */
-@@ -168,9 +157,6 @@ export function createSecurityAuthResolver(
+@@ -170,9 +159,6 @@ export function createSecurityAuthResolver(
  		if (model.api !== auth.api) {
  			throw new Error("Security scan authentication API mismatch");
  		}
