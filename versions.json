@@ -1,6 +1,6 @@
 {
-  "version": "18.16.0",
+  "version": "18.17.0",
   "patches": "5911dd6d",
-  "url": "https://github.com/Sylonin/omp-nix/releases/download/v18.16.0-p5911dd6d/omp-linux-x64",
-  "hash": "sha256-6vC0ulpqpbICQdbAh1nSwLTOqciinR/hBPv6/4kEtbY="
+  "url": "https://github.com/Sylonin/omp-nix/releases/download/v18.17.0-p5911dd6d/omp-linux-x64",
+  "hash": "sha256-WgXmuN4UkP7SI0XwDJbcY4YQLsEbeih/nZ5nuV0+YuM="
 }
