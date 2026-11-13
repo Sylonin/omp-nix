@@ -1,6 +1,6 @@
 # omp-nix (patched)
 
-Nix flake for [Oh My Pi](https://github.com/can1357/oh-my-pi), built from each upstream release with the patches in `patches/` applied. Only `x86_64-linux` is built.
+Nix flake for [Oh My Pi](https://github.com/can1357/oh-my-pi), built from each upstream release with the patches in `patches/*.patch` applied. Only `x86_64-linux` is built. Patches in `patches/disabled/` are kept but not applied; move one back to `patches/` to enable it again.
 
 `.github/workflows/build.yml` runs every 2 hours and on changes to `patches/`. When the latest upstream release or the patch set differs from `versions.json`, it:
 
@@ -9,7 +9,7 @@ Nix flake for [Oh My Pi](https://github.com/can1357/oh-my-pi), built from each u
 3. Builds and smoke-tests `omp-linux-x64`.
 4. Publishes it as release `v<version>-p<patch hash>`, updates `versions.json`, verifies `nix build`, and commits.
 
-A patch that no longer applies fails the run; fix the patch and push.
+A patch that no longer applies fails the run; fix the patch and push. With no patches enabled, the run builds stock upstream.
 
 ```nix
 {
