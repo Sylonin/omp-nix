@@ -29,7 +29,9 @@ jobs:
           set -euo pipefail
           tag=$(gh release view -R can1357/oh-my-pi --json tagName -q .tagName)
           version=${tag#v}
-          patches=$(cat patches/*.patch | sha256sum | cut -c1-8)
+          shopt -s nullglob
+          patch_files=(patches/*.patch)
+          patches=$(cat /dev/null "${patch_files[@]}" | sha256sum | cut -c1-8)
           if [ "$version" = "$(jq -r .version versions.json)" ] && [ "$patches" = "$(jq -r .patches versions.json)" ]; then
             echo "Up to date: $version with patches $patches"
             echo build=false >> "$GITHUB_OUTPUT"
@@ -68,7 +70,10 @@ jobs:
           VERSION: ${{ steps.check.outputs.version }}
         run: |
           set -euo pipefail
-          git apply --verbose ../patches/*.patch
+          shopt -s nullglob
+          patch_files=(../patches/*.patch)
+          # With no arguments, git apply would read a patch from stdin.
+          if [ ${#patch_files[@]} -gt 0 ]; then git apply --verbose "${patch_files[@]}"; fi
           bun install --frozen-lockfile
           natives=$(mktemp -d)
           curl -fsSL --retry 3 "$(npm view "@oh-my-pi/pi-natives-linux-x64@$VERSION" dist.tarball)" | tar -xz -C "$natives"
