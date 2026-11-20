@@ -1,6 +1,6 @@
 {
-  "version": "19.0.0",
+  "version": "19.0.1",
   "patches": "e3b0c442",
-  "url": "https://github.com/Sylonin/omp-nix/releases/download/v19.0.0-pe3b0c442/omp-linux-x64",
-  "hash": "sha256-0VXoFw6UDCD9Kjrkx62QfA8xAwnW5HQ4rENtycy98tc="
+  "url": "https://github.com/Sylonin/omp-nix/releases/download/v19.0.1-pe3b0c442/omp-linux-x64",
+  "hash": "sha256-9vskGwjY5bfmPYOPZdP6f4FXfOTqCHGFbYL4Wj7KJHg="
 }
